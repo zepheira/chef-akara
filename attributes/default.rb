@@ -1,0 +1,10 @@
+default['akara']['port']                      = 8880
+default['akara']['home']                      = "/opt/akara/"
+default['akara']['user']                      = "akara"
+default['akara']['group']                     = "akara"
+default['akara']['virtualenv']                = "akara-default"
+default['akara']['max_servers']               = 100
+default['akara']['max_spare_servers']         = 30
+default['akara']['min_spare_servers']         = 10
+default['akara']['max_requests_per_server']   = 1000
+default['akara']['log_level']                 = "INFO"

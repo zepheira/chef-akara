@@ -1,0 +1,46 @@
+#!/bin/sh
+
+# Adapted from http://wiki.pylonshq.com/display/pylonscookbook/init.d+script+to+start+and+stop+an+app
+
+# path to app
+APP_PATH="<%= node['akara']['home']+node['akara']['virtualenv'] %>"
+
+DAEMON=$APP_PATH/bin/akara
+
+DAEMON_OPTS="-f $APP_PATH/akara.conf"
+
+RUN_AS="<%= node['akara']['user'] %>"
+
+PID_FILE=$APP_PATH/logs/akara.pid
+
+
+############### END EDIT ME ##################
+
+test -x $DAEMON || exit 0
+
+set -e
+
+case "$1" in
+  start)
+        echo -n "Starting Akara: "
+        . <%= node['akara']['home']+node['akara']['virtualenv']+'/bin/activate' %>
+        start-stop-daemon -d $APP_PATH -c $RUN_AS --start --background --pidfile $PID_FILE --startas $DAEMON -- $DAEMON_OPTS start
+        ;;
+  stop)
+        echo -n "Stopping Akara: "
+        start-stop-daemon --stop --pidfile $PID_FILE
+        ;;
+
+  restart|force-reload)
+        echo -n "Restarting Akara: "
+        . <%= node['akara']['home']+node['akara']['virtualenv']+'/bin/activate' %>
+        start-stop-daemon -d $APP_PATH -c $RUN_AS --start --pidfile $PID_FILE --startas $DAEMON -- $DAEMON_OPTS restart
+        ;;
+  *)
+        N=/etc/init.d/akara
+        echo "Usage: $N {start|stop|restart|force-reload}" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
