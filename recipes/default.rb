@@ -1,85 +1,115 @@
 include_recipe 'python'
 
 # Package dependencies
-['git-core','python-dev'].each do |pkg|
+%w{git-core python-dev}.each do |pkg|
   package pkg do
     action :install
   end
 end
 
-user node[:akara][:user] do
+user node["akara"]["user"] do
   action :create
   system true
   shell "/bin/false"
 end
 
-directory node[:akara][:home] do
-  owner node[:akara][:user]
-  group node[:akara][:group]
-  mode "0755"
+directory node["akara"]["base"] do
+  owner node["akara"]["user"]
+  group node["akara"]["group"]
+  mode 00755
   action :create
 end
 
-venv_path = node[:akara][:home]+node[:akara][:virtualenv]
+data_bag(node["akara"]["data_bag"]).each do |name|
+  venv = "#{node["akara"]["base"]}/#{name.to_s}"
+  instance = data_bag_item(node["akara"]["data_bag"], name.to_s)
 
-python_virtualenv venv_path do
-  owner node[:akara][:user]
-  group node[:akara][:group]
-#  interpreter 'python2.7'
-  action :create
-end
-
-# perform Akara setup
-#execute "akara-setup" do
-#  command node[:akara][:home]+node[:akara][:virtualenv]+'/bin/akara setup'
-#  creates node[:akara][:home]+node[:akara][:virtualenv]+'/logs'
-#  cwd node[:akara][:home]+node[:akara][:virtualenv]
-#  user node[:akara][:user]
-#  group node[:akara][:group]
-#  action :run
-#end
-
-# shortcut Akara setup by manually creating logs dir
-directory node[:akara][:home]+node[:akara][:virtualenv]+'/logs' do
-  owner node[:akara][:user]
-  group node[:akara][:group]
-  mode "0755"
-  action :create
-end
-
-['html5lib','httplib2','python-dateutil','simplejson','feedparser','xlrd'].each do |pkg|
-  python_pip pkg do
-    action :install
-    virtualenv venv_path
+  python_virtualenv venv do
+    options "--distribute --no-site-packages"
+    owner node["akara"]["user"]
+    group node["akara"]["group"]
+    action :create
   end
-end
 
-python_pip "git+git://github.com/zepheira/amara.git" do
-  virtualenv venv_path
-  action :install
-end
+  %w{logs caches}.each do |dir|
+    directory "#{venv}/#{dir}" do
+      owner node["akara"]["user"]
+      group node["akara"]["group"]
+      mode 00755
+      action :create
+    end
+  end
 
-python_pip "git+git://github.com/zepheira/akara.git" do
-  virtualenv venv_path
-  action :install
-end
+  requirements = %w{html5lib httplib2 python-dateutil simplejson feedparser xlrd amara akara}
+  seen = []
+  instance["packages"].each do |pkg,vers|
+    seen.push pkg.downcase
+    python_pip pkg do
+      virtualenv venv
+      options instance["pip_options"]
+      version vers
+      action :install
+    end
+  end
 
-template "/etc/init.d/akara" do
-  source "akara.init.erb"
-  mode "0755"
-end
+  requirements.each do |pkg|
+    if !seen.include?(pkg)
+      if pkg.eql?("amara")
+        python_pip "git+git://github.com/zepheira/amara.git" do
+          virtualenv venv
+          options instance["pip_options"]
+          action :install
+        end
+      elsif pkg.eql?("akara")
+        python_pip "git+git://github.com/zepheira/akara.git" do
+          virtualenv venv
+          options instance["pip_options"]
+          action :install
+        end
+      else
+        python_pip pkg do
+          virtualenv venv
+          options instance["pip_options"]
+          action :install
+        end
+      end
+    end
+  end
 
-service "akara" do
-  #provider Chef::Provider::Service::Init::Debian
-  enabled true
-  supports :status => true, :restart => true
-  action [:start, :enable]
-end
+  template "/etc/init.d/akara-#{name.to_s}" do
+    source "akara.init.erb"
+    owner "root"
+    group "root"
+    mode 00755
+    variables({:name => name.to_s, :venv => venv, :user => node["akara"]["user"]})
+  end
 
-template "#{venv_path}/akara.conf" do
-  owner node[:akara][:user]
-  group node[:akara][:group]
-  source "akara.conf.erb"
-  mode "0644"
-  notifies :restart, resources(:service => "akara"), :immediately
+  service "akara-#{name.to_s}" do
+    enabled true
+    supports :status => true, :restart => true
+    action :nothing
+  end
+
+  template "#{venv}/akara.conf" do
+    source "akara.conf.erb"
+    owner node["akara"]["user"]
+    group node["akara"]["group"]
+    mode 00644
+    variables({:config => instance, :venv => venv})
+    notifies :restart, resources(:service => "akara-#{name.to_s}"), :immediately
+  end
+
+  iptables_rule "akara-#{name.to_s}" do
+    source "akara-iptables.erb"
+    variables({ :port => instance["port"] })
+  end
+
+  if node[:recipes].include?("monit")
+    monit_service "akara-#{name.to_s}" do
+      pidfile "#{venv}/logs/akara.pid"
+      start "/etc/init.d/akara-#{name.to_s} start"
+      stop "/etc/init.d/akara-#{name.to_s} stop"
+    end
+  end
+
 end

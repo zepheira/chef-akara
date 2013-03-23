@@ -1,44 +1,49 @@
 #!/bin/sh
 
-# Adapted from http://wiki.pylonshq.com/display/pylonscookbook/init.d+script+to+start+and+stop+an+app
+### BEGIN INIT INFO
+# Provides:           akara-<%= @name %>
+# Required-Start:
+# Required-Stop:
+# Default-Sart:       2 3 4 5
+# Default-Stop:       0 1 6
+# Short-Description:  Starts Akara (<%= @name %>) services
+# Description:        Starts Akara (<%= @name %>) services
+### END INIT INFO
 
-# path to app
-APP_PATH="<%= node['akara']['home']+node['akara']['virtualenv'] %>"
+APP_PATH=<%= @venv %>
+DAEMON=${APP_PATH}/bin/akara
+DAEMON_OPTS="-f ${APP_PATH}/akara.conf"
+RUN_AS=<%= @user %>
+PID_FILE=${APP_PATH}/logs/akara.pid
 
-DAEMON=$APP_PATH/bin/akara
-
-DAEMON_OPTS="-f $APP_PATH/akara.conf"
-
-RUN_AS="<%= node['akara']['user'] %>"
-
-PID_FILE=$APP_PATH/logs/akara.pid
-
-
-############### END EDIT ME ##################
-
-test -x $DAEMON || exit 0
+test -x $DAEMON || exit 1
 
 set -e
 
 case "$1" in
   start)
         echo -n "Starting Akara: "
-        . <%= node['akara']['home']+node['akara']['virtualenv']+'/bin/activate' %>
-        start-stop-daemon -d $APP_PATH -c $RUN_AS --start --background --pidfile $PID_FILE --startas $DAEMON -- $DAEMON_OPTS start
+        start-stop-daemon -d ${APP_PATH} -c ${RUN_AS} --start --background --pidfile ${PID_FILE} --startas ${DAEMON} -- ${DAEMON_OPTS} start
         ;;
   stop)
         echo -n "Stopping Akara: "
-        start-stop-daemon --stop --pidfile $PID_FILE
+        start-stop-daemon --stop --pidfile ${PID_FILE}
         ;;
-
+  status)
+        ${DAEMON} ${DAEMON_OPTS} status
+        ;;
   restart|force-reload)
         echo -n "Restarting Akara: "
-        . <%= node['akara']['home']+node['akara']['virtualenv']+'/bin/activate' %>
-        start-stop-daemon -d $APP_PATH -c $RUN_AS --start --pidfile $PID_FILE --startas $DAEMON -- $DAEMON_OPTS restart
+        COMMAND="restart"
+        BACKGROUND=""
+        if [ ! -f "${PID_FILE}" ]; then
+            COMMAND="start"
+            BACKGROUND="--background"
+        fi
+        start-stop-daemon -d ${APP_PATH} -c ${RUN_AS} --start ${BACKGROuND} --pidfile ${PID_FILE} --startas ${DAEMON} -- ${DAEMON_OPTS} ${COMMAND}
         ;;
   *)
-        N=/etc/init.d/akara
-        echo "Usage: $N {start|stop|restart|force-reload}" >&2
+        echo "Usage: $0 {start|stop|status|restart|force-reload}" >&2
         exit 1
         ;;
 esac
