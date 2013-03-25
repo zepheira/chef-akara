@@ -20,6 +20,13 @@ directory node["akara"]["base"] do
   action :create
 end
 
+directory node["akara"]["log_base"] do
+  owner node["akara"]["user"]
+  group node["akara"]["group"]
+  mode 00770
+  action :create
+end
+
 data_bag(node["akara"]["data_bag"]).each do |name|
   venv = "#{node["akara"]["base"]}/#{name.to_s}"
   instance = data_bag_item(node["akara"]["data_bag"], name.to_s)
@@ -31,13 +38,24 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     action :create
   end
 
-  %w{logs caches}.each do |dir|
-    directory "#{venv}/#{dir}" do
-      owner node["akara"]["user"]
-      group node["akara"]["group"]
-      mode 00755
-      action :create
-    end
+  directory "#{venv}/caches" do
+    owner node["akara"]["user"]
+    group node["akara"]["group"]
+    mode 00755
+    action :create
+  end
+
+  directory "#{node["akara"]["log_base"]}#{name.to_s}" do
+    owner node["akara"]["user"]
+    group node["akara"]["group"]
+    mode 00770
+    action :create
+  end
+
+  link "#{venv}/logs" do
+    to "#{node["akara"]["log_base"]}#{name.to_s}"
+    action :create
+    link_type :symbolic
   end
 
   requirements = %w{html5lib httplib2 python-dateutil simplejson feedparser xlrd amara akara}
@@ -97,6 +115,14 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     mode 00644
     variables({:config => instance, :venv => venv})
     notifies :restart, resources(:service => "akara-#{name.to_s}"), :immediately
+  end
+
+  template "/etc/logrotate.d/akara-#{name.to_s}" do
+    source "logrotate.erb"
+    owner "root"
+    group "root"
+    mode 00644
+    variables({:name => name.to_s, :owner => owner, :group => group})
   end
 
   iptables_rule "akara-#{name.to_s}" do

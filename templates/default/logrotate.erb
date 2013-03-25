@@ -1,0 +1,13 @@
+<%= node["akara"]["log_base"] %>/<%= @name %>/*.log {
+    weekly
+    missingok
+    rotate 10
+    compress
+    delaycompress
+    notifempty
+    sharedscripts
+    create 640 <%= @owner %> <%= @group %>
+    postrotate
+        /etc/init.d/akara-<%= @name %> restart > /dev/null
+    endscript
+}
