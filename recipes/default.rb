@@ -45,7 +45,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     action :create
   end
 
-  directory "#{node["akara"]["log_base"]}#{name.to_s}" do
+  directory "#{node["akara"]["log_base"]}/#{name.to_s}" do
     owner node["akara"]["user"]
     group node["akara"]["group"]
     mode 00770
@@ -53,7 +53,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
   end
 
   link "#{venv}/logs" do
-    to "#{node["akara"]["log_base"]}#{name.to_s}"
+    to "#{node["akara"]["log_base"]}/#{name.to_s}"
     action :create
     link_type :symbolic
   end
@@ -105,7 +105,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
   service "akara-#{name.to_s}" do
     enabled true
     supports :status => true, :restart => true
-    action :nothing
+    action :enable
   end
 
   template "#{venv}/akara.conf" do
