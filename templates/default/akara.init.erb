@@ -35,12 +35,10 @@ case "$1" in
   restart|force-reload)
         echo -n "Restarting Akara: "
         COMMAND="restart"
-        BACKGROUND=""
         if [ ! -f "${PID_FILE}" ]; then
             COMMAND="start"
-            BACKGROUND="--background"
         fi
-        start-stop-daemon -d ${APP_PATH} -c ${RUN_AS} --start ${BACKGROuND} --pidfile ${PID_FILE} --startas ${DAEMON} -- ${DAEMON_OPTS} ${COMMAND}
+        ${DAEMON} ${DAEMON_OPTS} ${COMMAND}
         ;;
   *)
         echo "Usage: $0 {start|stop|status|restart|force-reload}" >&2

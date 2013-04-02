@@ -6,7 +6,7 @@
     delaycompress
     notifempty
     sharedscripts
-    create 640 <%= @owner %> <%= @group %>
+    create 644 <%= @owner %> <%= @group %>
     postrotate
         /etc/init.d/akara-<%= @name %> restart > /dev/null
     endscript

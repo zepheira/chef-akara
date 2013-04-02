@@ -122,7 +122,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     owner "root"
     group "root"
     mode 00644
-    variables({:name => name.to_s, :owner => owner, :group => group})
+    variables({:name => name.to_s, :owner => node["akara"]["user"], :group => node["akara"]["group"]})
   end
 
   iptables_rule "akara-#{name.to_s}" do
