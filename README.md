@@ -7,8 +7,6 @@ Requirements
 ============
 
 * [python](https://github.com/opscode-cookbooks/python)
-* iptables
-* monit
 
 Tested on:
 

@@ -1,4 +1,4 @@
-include_recipe 'python'
+include_recipe "python"
 
 # Package dependencies
 %w{git-core python-dev}.each do |pkg|
@@ -103,7 +103,6 @@ data_bag(node["akara"]["data_bag"]).each do |name|
   end
 
   service "akara-#{name.to_s}" do
-    enabled true
     supports :status => true, :restart => true
     action :enable
   end
@@ -114,7 +113,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     group node["akara"]["group"]
     mode 00644
     variables({:config => instance, :venv => venv})
-    notifies :restart, resources(:service => "akara-#{name.to_s}"), :immediately
+    notifies :restart, "service[akara-#{name.to_s}]", :immediately
   end
 
   template "/etc/logrotate.d/akara-#{name.to_s}" do
@@ -123,19 +122,6 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     group "root"
     mode 00644
     variables({:name => name.to_s, :owner => node["akara"]["user"], :group => node["akara"]["group"]})
-  end
-
-  iptables_rule "akara-#{name.to_s}" do
-    source "akara-iptables.erb"
-    variables({ :port => instance["port"] })
-  end
-
-  if node[:recipes].include?("monit")
-    monit_service "akara-#{name.to_s}" do
-      pidfile "#{venv}/logs/akara.pid"
-      start "/etc/init.d/akara-#{name.to_s} start"
-      stop "/etc/init.d/akara-#{name.to_s} stop"
-    end
   end
 
 end
