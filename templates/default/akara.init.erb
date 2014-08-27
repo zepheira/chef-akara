@@ -23,6 +23,15 @@ set -e
 case "$1" in
   start)
         echo -n "Starting Akara: "
+        if [ -f ${PID_FILE} ]; then
+            PID=`cat $PID_FILE`
+            if [ -f /proc/${PID}/status ]; then
+                echo "already running! ($PID)"
+                exit 0
+            else
+                rm ${PID_FILE}
+            fi
+        fi
         start-stop-daemon -d ${APP_PATH} -c ${RUN_AS} --start --background --pidfile ${PID_FILE} --startas ${DAEMON} -- ${DAEMON_OPTS} start
         ;;
   stop)
