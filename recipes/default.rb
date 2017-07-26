@@ -123,7 +123,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     path ["#{node["akara"]["log_base"]}/#{name.to_s}/*.log"]
     options ["missingok","compress","delaycompress","notifempty","sharedscripts"]
     postrotate <<-EOH
-        /etc/init.d/akara-<%= @name %> restart >/dev/null 2>&1
+        /etc/init.d/akara-#{name.to_s} restart >/dev/null 2>&1
 EOH
   end
 
