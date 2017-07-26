@@ -8,3 +8,4 @@ recipe            "akara", "Includes the client recipe to configure a server"
 name              "akara"
 
 depends           "python"
+depends           "logrotate"
