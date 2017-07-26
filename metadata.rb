@@ -9,3 +9,4 @@ name              "akara"
 
 depends           "python"
 depends           "logrotate"
+depends           "systemd"

@@ -1,6 +1,8 @@
+# Cookbook Name:: akara
+# Recipe:: default
+
 include_recipe "python"
 
-# Package dependencies
 %w{git-core python-dev}.each do |pkg|
   package pkg
 end
@@ -92,17 +94,24 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     end
   end
 
-  template "/etc/init.d/akara-#{name.to_s}" do
-    source "akara.init.erb"
-    owner "root"
-    group "root"
-    mode 00755
-    variables({:name => name.to_s, :venv => venv, :user => node["akara"]["user"]})
+  systemd_service "akara-#{name.to_s}" do
+    unit_description "Akara (#{name.to_s})"
+    unit_after "network.target"
+    service_type "forking"
+    service_pid_file "#{venv}/logs/akara.pid"
+    service_working_directory venv
+    service_exec_start "#{venv}/bin/akara -f #{venv}/akara.conf start"
+    service_exec_stop "#{venv}/bin/akara stop"
+    service_exec_reload "#{venv}/bin/akara -f #{venv}/akara.conf restart"
+    service_restart "on-failure"
+    service_restart_sec "3s"
+    service_user node["akara"]["user"]
+    install_wanted_by "multi-user.target"
   end
 
   service "akara-#{name.to_s}" do
     supports :status => true, :restart => true
-    action :enable
+    action [:enable, :start]
   end
 
   template "#{venv}/akara.conf" do
@@ -114,7 +123,6 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     notifies :restart, "service[akara-#{name.to_s}]", :immediately
   end
 
-  # adapt to systemd...
   logrotate_app "akara-#{name.to_s}" do
     action :enable
     rotate 10
@@ -123,8 +131,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     path ["#{node["akara"]["log_base"]}/#{name.to_s}/*.log"]
     options ["missingok","compress","delaycompress","notifempty","sharedscripts"]
     postrotate <<-EOH
-        /etc/init.d/akara-#{name.to_s} restart >/dev/null 2>&1
+        /bin/systemctl restart akara-#{name.to_s} >/dev/null 2>&1
 EOH
   end
-
 end
