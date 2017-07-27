@@ -8,7 +8,7 @@ issues_url        "https://github.com/zepheira/chef-akara/issues" if respond_to?
 source_url        "https://github.com/zepheira/chef-akara" if respond_to?(:source_url)
 supports          "ubuntu", ">= 16.04"
 name              "akara"
-version           "1.2.1"
+version           "2.0.0"
 
 depends           "python"
 depends           "logrotate"
