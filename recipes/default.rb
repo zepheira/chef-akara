@@ -94,6 +94,15 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     end
   end
 
+  template "#{venv}/akara.conf" do
+    source "akara.conf.erb"
+    owner node["akara"]["user"]
+    group node["akara"]["group"]
+    mode 00644
+    variables({:config => instance, :venv => venv})
+    notifies :restart, "service[akara-#{name.to_s}]", :immediately
+  end
+
   systemd_service "akara-#{name.to_s}" do
     unit_description "Akara (#{name.to_s})"
     unit_after "network.target"
@@ -112,15 +121,6 @@ data_bag(node["akara"]["data_bag"]).each do |name|
   service "akara-#{name.to_s}" do
     supports :status => true, :restart => true
     action [:enable, :start]
-  end
-
-  template "#{venv}/akara.conf" do
-    source "akara.conf.erb"
-    owner node["akara"]["user"]
-    group node["akara"]["group"]
-    mode 00644
-    variables({:config => instance, :venv => venv})
-    notifies :restart, "service[akara-#{name.to_s}]", :immediately
   end
 
   logrotate_app "akara-#{name.to_s}" do
