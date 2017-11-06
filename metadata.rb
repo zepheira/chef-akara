@@ -10,6 +10,6 @@ supports          "ubuntu", ">= 16.04"
 name              "akara"
 version           "2.0.0"
 
-depends           "python"
+depends           "poise-python"
 depends           "logrotate"
 depends           "systemd"

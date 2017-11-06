@@ -1,11 +1,12 @@
 # Cookbook Name:: akara
 # Recipe:: default
 
-include_recipe "python"
-
-%w{git-core python-dev}.each do |pkg|
-  package pkg
+python_runtime "akara" do
+  version "2.7"
+  options :system, dev_package: true
 end
+
+package "git-core"
 
 user node["akara"]["user"] do
   action :create
@@ -24,6 +25,7 @@ directory node["akara"]["log_base"] do
   owner node["akara"]["user"]
   group node["akara"]["group"]
   mode 00770
+  recursive true
   action :create
 end
 
@@ -31,11 +33,13 @@ data_bag(node["akara"]["data_bag"]).each do |name|
   venv = "#{node["akara"]["base"]}/#{name.to_s}"
   instance = data_bag_item(node["akara"]["data_bag"], name.to_s)
 
-  python_virtualenv venv do
-    options "--distribute --no-site-packages"
-    owner node["akara"]["user"]
-    group node["akara"]["group"]
+  python_virtualenv "akara-#{name.to_s}" do
     action :create
+    path venv
+    python "akara"
+    system_site_packages false
+    user node["akara"]["user"]
+    group node["akara"]["group"]
   end
 
   directory "#{venv}/caches" do
@@ -49,6 +53,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     owner node["akara"]["user"]
     group node["akara"]["group"]
     mode 00770
+    recursive true
     action :create
   end
 
@@ -58,37 +63,39 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     link_type :symbolic
   end
 
-  requirements = %w{html5lib httplib2 python-dateutil simplejson feedparser xlrd amara akara}
+  reqs = %w{html5lib httplib2 python-dateutil simplejson feedparser xlrd amara akara}
   seen = []
   instance["packages"].each do |pkg,vers|
     seen.push pkg.downcase
-    python_pip pkg do
-      virtualenv venv
+    python_package pkg do
+      action :install
+      user node["akara"]["user"]
+      group node["akara"]["group"]
+      virtualenv "akara-#{name.to_s}"
       options instance["pip_options"]
       version vers
-      action :install
     end
   end
 
-  requirements.each do |pkg|
+  reqs.each do |pkg|
     if !seen.include?(pkg)
       if pkg.eql?("amara")
-        python_pip "git+git://github.com/zepheira/amara.git" do
-          virtualenv venv
-          options instance["pip_options"]
+        python_package "git+git://github.com/zepheira/amara.git" do
           action :install
+          virtualenv "akara-#{name.to_s}"
+          options instance["pip_options"]
         end
       elsif pkg.eql?("akara")
-        python_pip "git+git://github.com/zepheira/akara.git" do
-          virtualenv venv
-          options instance["pip_options"]
+        python_package "git+git://github.com/zepheira/akara.git" do
           action :install
+          virtualenv "akara-#{name.to_s}"
+          options instance["pip_options"]
         end
       else
-        python_pip pkg do
-          virtualenv venv
-          options instance["pip_options"]
+        python_package pkg do
           action :install
+          virtualenv "akara-#{name.to_s}"
+          options instance["pip_options"]
         end
       end
     end
@@ -100,7 +107,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     group node["akara"]["group"]
     mode 00644
     variables({:config => instance, :venv => venv})
-    notifies :restart, "service[akara-#{name.to_s}]", :immediately
+    notifies :restart, "service[akara-#{name.to_s}]", :delayed
   end
 
   systemd_service "akara-#{name.to_s}" do
