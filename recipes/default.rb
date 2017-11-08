@@ -1,11 +1,12 @@
-include_recipe "python"
+# Cookbook Name:: akara
+# Recipe:: default
 
-# Package dependencies
-%w{git-core python-dev}.each do |pkg|
-  package pkg do
-    action :install
-  end
+python_runtime "akara" do
+  version "2.7"
+  options :system, dev_package: true
 end
+
+package "git-core"
 
 user node["akara"]["user"] do
   action :create
@@ -24,6 +25,7 @@ directory node["akara"]["log_base"] do
   owner node["akara"]["user"]
   group node["akara"]["group"]
   mode 00770
+  recursive true
   action :create
 end
 
@@ -31,11 +33,13 @@ data_bag(node["akara"]["data_bag"]).each do |name|
   venv = "#{node["akara"]["base"]}/#{name.to_s}"
   instance = data_bag_item(node["akara"]["data_bag"], name.to_s)
 
-  python_virtualenv venv do
-    options "--distribute --no-site-packages"
-    owner node["akara"]["user"]
-    group node["akara"]["group"]
+  python_virtualenv "akara-#{name.to_s}" do
     action :create
+    path venv
+    python "akara"
+    system_site_packages false
+    user node["akara"]["user"]
+    group node["akara"]["group"]
   end
 
   directory "#{venv}/caches" do
@@ -49,6 +53,7 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     owner node["akara"]["user"]
     group node["akara"]["group"]
     mode 00770
+    recursive true
     action :create
   end
 
@@ -58,53 +63,42 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     link_type :symbolic
   end
 
-  requirements = %w{html5lib httplib2 python-dateutil simplejson feedparser xlrd amara akara}
+  reqs = %w{html5lib httplib2 python-dateutil simplejson feedparser xlrd amara akara}
   seen = []
   instance["packages"].each do |pkg,vers|
     seen.push pkg.downcase
-    python_pip pkg do
-      virtualenv venv
+    python_package pkg do
+      action :install
+      user node["akara"]["user"]
+      group node["akara"]["group"]
+      virtualenv "akara-#{name.to_s}"
       options instance["pip_options"]
       version vers
-      action :install
     end
   end
 
-  requirements.each do |pkg|
+  reqs.each do |pkg|
     if !seen.include?(pkg)
       if pkg.eql?("amara")
-        python_pip "git+git://github.com/zepheira/amara.git" do
-          virtualenv venv
-          options instance["pip_options"]
+        python_package "git+git://github.com/zepheira/amara.git" do
           action :install
+          virtualenv "akara-#{name.to_s}"
+          options instance["pip_options"]
         end
       elsif pkg.eql?("akara")
-        python_pip "git+git://github.com/zepheira/akara.git" do
-          virtualenv venv
-          options instance["pip_options"]
+        python_package "git+git://github.com/zepheira/akara.git" do
           action :install
+          virtualenv "akara-#{name.to_s}"
+          options instance["pip_options"]
         end
       else
-        python_pip pkg do
-          virtualenv venv
-          options instance["pip_options"]
+        python_package pkg do
           action :install
+          virtualenv "akara-#{name.to_s}"
+          options instance["pip_options"]
         end
       end
     end
-  end
-
-  template "/etc/init.d/akara-#{name.to_s}" do
-    source "akara.init.erb"
-    owner "root"
-    group "root"
-    mode 00755
-    variables({:name => name.to_s, :venv => venv, :user => node["akara"]["user"]})
-  end
-
-  service "akara-#{name.to_s}" do
-    supports :status => true, :restart => true
-    action :enable
   end
 
   template "#{venv}/akara.conf" do
@@ -113,15 +107,38 @@ data_bag(node["akara"]["data_bag"]).each do |name|
     group node["akara"]["group"]
     mode 00644
     variables({:config => instance, :venv => venv})
-    notifies :restart, "service[akara-#{name.to_s}]", :immediately
+    notifies :restart, "service[akara-#{name.to_s}]", :delayed
   end
 
-  template "/etc/logrotate.d/akara-#{name.to_s}" do
-    source "logrotate.erb"
-    owner "root"
-    group "root"
-    mode 00644
-    variables({:name => name.to_s, :owner => node["akara"]["user"], :group => node["akara"]["group"]})
+  systemd_service "akara-#{name.to_s}" do
+    unit_description "Akara (#{name.to_s})"
+    unit_after "network.target"
+    service_type "forking"
+    service_pid_file "#{venv}/logs/akara.pid"
+    service_working_directory venv
+    service_exec_start "#{venv}/bin/akara -f #{venv}/akara.conf start"
+    service_exec_stop "#{venv}/bin/akara stop"
+    service_exec_reload "#{venv}/bin/akara -f #{venv}/akara.conf restart"
+    service_restart "on-failure"
+    service_restart_sec "3s"
+    service_user node["akara"]["user"]
+    install_wanted_by "multi-user.target"
   end
 
+  service "akara-#{name.to_s}" do
+    supports :status => true, :restart => true
+    action [:enable, :start]
+  end
+
+  logrotate_app "akara-#{name.to_s}" do
+    action :enable
+    rotate 10
+    frequency "weekly"
+    create "644 #{node["akara"]["user"]} #{node["akara"]["group"]}"
+    path ["#{node["akara"]["log_base"]}/#{name.to_s}/*.log"]
+    options ["missingok","compress","delaycompress","notifempty","sharedscripts"]
+    postrotate <<-EOH
+        /bin/systemctl restart akara-#{name.to_s} >/dev/null 2>&1
+EOH
+  end
 end

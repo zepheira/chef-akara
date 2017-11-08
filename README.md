@@ -7,10 +7,12 @@ Requirements
 ============
 
 * [python](https://github.com/opscode-cookbooks/python)
+* logrotate
+* systemd
 
 Tested on:
 
-* Ubuntu 12.04
+* Ubuntu 16.04
 
 Attributes
 ==========
